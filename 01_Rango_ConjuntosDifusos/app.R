@@ -1,0 +1,520 @@
+# Librerías
+libraries <- c("shiny", "FuzzyR", "shinyWidgets", "shinydashboard", "DataExplorer",
+               "openxlsx", "dplyr", "xray", "DT","htmlwidgets")
+
+# Instala los paquetes si no están instalados
+install.packages(setdiff(libraries, rownames(installed.packages())), dependencies = TRUE)
+
+# Cargar librerías
+lapply(libraries, library, character.only = TRUE)
+
+# DEFINIR FUNCIONES VARIAS
+# Función para calcular la Gaussiana
+gaussiana <- function(x, a, b) {
+  # Calcula el valor de la función Gaussiana para un valor x, con parámetros a y b.
+  # x: valor para el cual se calcula la Gaussiana
+  # a: media de la distribución
+  # b: desviación estándar de la distribución
+  return(exp(-((x - a) / b)^2))
+  # exp(-((x - a) / b)^2) -> la fórmula de la Gaussiana sin la constante de normalización
+}
+
+# Función para calcular la Triangular
+triangular <- function(x, a, b, c) {
+  # Calcula el valor de la función triangular para un valor x, con parámetros a, b y c.
+  # x: valor para el cual se calcula la función triangular
+  # a: límite inferior del soporte de la función triangular
+  # b: modo (pico) de la función triangular
+  # c: límite superior del soporte de la función triangular
+  return(pmax(
+    pmin((x - a) / (b - a), (c - x) / (c - b)), 0))
+  # pmin((x - a) / (b - a), (c - x) / (c - b)) -> calcula el valor mínimo entre las dos partes de la función triangular
+  # pmax(..., 0) -> asegura que el valor mínimo retornado sea al menos 0
+}
+
+# Define la interfaz de usuario de Shiny
+
+  # Encabezado --------------------------------------------------------------
+  header <- dashboardHeader( title="Definir conjuntos difusos y aplicar la función de membresía" )
+
+  # Sidebar -----------------------------------------------------------------
+  sidebar <- dashboardSidebar(
+    sidebarMenu(
+      menuItem("Tabla de Datos Original", tabName = "datos_ori", icon = icon("table")),
+      menuItem("Borrosificación", tabName = "var_fuzzy", icon = icon("cog", lib = "glyphicon"))
+    ),
+    actionButton("exit_btn", "Salir")
+  )
+  
+  # Cuerpo ------------------------------------------------------------------
+  body <- dashboardBody(
+  		tabItems(
+  				tabItem(
+  				  tabName = "datos_ori",
+  				  h2("Carga de fichero CSV"), 
+  				  box(width = 12,
+  						# Opciones de archivo
+  						h5("Recuerde revisar que la tabla tenga etiqueta de observaciones ID"), 
+  						h5("Por defecto queda marcado que la primer fila sea etiquetas de variables"), 
+  						materialSwitch(inputId = "header", "El archivo tiene encabezado", value = TRUE),
+  						materialSwitch(inputId = "nominales", "La tabla tiene Variables Categóricas Nominales", value = TRUE),
+  						h5("También revisar el tipo de separador de columna y el simbolo decimal"), 
+  						radioButtons("sep", "Separador de campos:", 
+  									 choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), 
+  									 selected = ";"),
+  						radioButtons("dec", "Separador decimal:", 
+  									 choices = c(Coma = ",", Punto = "."), 
+  									 selected = '.'),
+  						h3(" "), 
+  						# Seleccionar el archivo CSV
+  						fileInput("file", "Selecciona un archivo CSV:", accept = ".csv"),
+  						h3(" ")			
+  				  ),
+  				  h2("Datos Originales"), 
+  				  box( width = 12,
+  				       h3("Estadísitcas de las Variables Cuantitativas"), 
+  				       verbatimTextOutput("estadi"),
+  				       box( plotOutput("histo") ),
+  				       box( plotOutput("corre") ),
+  				       conditionalPanel(
+  				         # La condición para mostrar este panel es que 'input.nominales' sea verdadero
+  				         condition = "input.nominales == true",
+  				         h3("Estadísticas de las Variables Cualitativas"),
+  				         # Salida gráfica para un gráfico de barras
+  				         plotOutput("bar_char", width = 400, height = 300),
+  				         h4("Referencias de Variables Cualitativas"),
+  				         # Salida de texto para mostrar las modalidades (categorías) de las variables cualitativas
+  				         verbatimTextOutput("modalidades")
+  				       )
+  			   	),
+  				  h3("Tabla de Datos"),
+  				  DTOutput("originalTable", height = 700)
+  				),
+  				tabItem(
+  				  tabName = "var_fuzzy",
+  					h3("Variable observada a Variable Difusa"),
+  					selectInput("variable", "Selección Variable a Fuzzyficar:", choices = NULL),
+  					box(width = 12,
+  						h3("Diseñar la Variable difusa"),   
+  						column( width = 5,
+      							   title = "Definir Funciones de membresia",
+  						         h5("Elija para ltipo de función de pertenecia"), 
+  						        awesomeRadio(
+  						          # Identificador del input
+  						          inputId = "tipo_set",
+  						          # Etiqueta que aparecerá junto a los botones de opción
+  						          label = "Radio buttons", 
+  						          # Opciones disponibles para el usuario
+  						          choices = c("Gaussiana", "Triangular"),
+  						          # Disposición de los botones en línea (TRUE para horizontal)
+  						          inline = TRUE, 
+  						          # Añade un checkbox junto a los botones de opción
+  						          checkbox = TRUE
+  						        ),
+  						        # Título con tamaño de encabezado 5
+  						        h5("Indique el dominio de valores"), 
+  						        # Input numérico para el valor mínimo
+  						        numericInput(
+  						          inputId = "min",            # Identificador del input
+  						          label = "Mínimo valor: ",   # Etiqueta del input
+  						          value = NULL                # Valor inicial (NULL para vacío)
+  						        ),
+  						        # Input numérico para el valor máximo
+  						        numericInput(
+  						          inputId = "max",            # Identificador del input
+  						          label = "Máximo valor: ",   # Etiqueta del input
+  						          value = NULL                # Valor inicial (NULL para vacío)
+  						        ),
+  						        # Título con tamaño de encabezado 3 (este está vacío para espaciar)
+  						        h3(),
+  						        # Input de texto para el vector de límites cerrados de rangos
+  						        textInput(
+  						          inputId = "numeric_vector",                         # Identificador del input
+  						          label = "Vector de Límites Cerrados de Rangos (separados por comas)"   # Etiqueta del input
+  						        ),
+  						        # Título con tamaño de encabezado 5 con ejemplos explicativos
+  						        h5("Por ejemplo: si tengo tres intervalos [0a1], (1a3], y (3a5] "),
+  						        h5("Los limites cerrados son cuatro: 0, 1, 3 y 5"),
+  						        h5("Las etiquetas serán tres: bajo, medio y alto"),
+  						        # Input de texto para las etiquetas de los conjuntos
+  						        textInput(
+  						          inputId = "label_input",      # Identificador del input
+  						          label = "Vector Etiquetas de los conjuntos (separadas por comas)"  # Etiqueta del input
+  						        ),
+  						        # Botón para generar parámetros
+  						        actionButton(
+  						          inputId = "save",               # Identificador del botón
+  						          label = "Generar parámetros"    # Texto del botón
+  						        ),
+  						        # Tabla de salida para mostrar la descripción de los intervalos
+  						        tableOutput("desc_intervalos"),
+  						        h3()
+  						),
+  						# Caja de ancho 6 que contiene una salida de imagen
+  						box(
+  						  width = 6,  # Ancho de la caja (en una escala de 12 columnas)
+  						  
+  						  # Salida de imagen con identificador 'funcionM'
+  						  imageOutput(
+  						    outputId = "funcionM",  # Identificador de la salida de imagen
+  						    width = 270,            # Ancho de la imagen en píxeles
+  						    height = 120            # Alto de la imagen en píxeles
+  						  )
+  						),
+  						# Otra caja de ancho 6 que contiene una salida de gráfico
+  						box(
+  						  width = 6,  # Ancho de la caja (en una escala de 12 columnas)
+  						  # Salida de gráfico con identificador 'var_plot'
+  						  plotOutput(
+  						    outputId = 'var_plot',  # Identificador de la salida del gráfico
+  						    width = "80%",          # Ancho del gráfico (80% del contenedor)
+  						    height = "250px"        # Alto del gráfico en píxeles
+  						  )
+  						),
+  						# Botón para descargar datos
+  						downloadButton(
+  						  outputId = "downloadData",  # Identificador del botón de descarga
+  						  label = "Descargar parámetros de los conjuntos"  # Etiqueta del botón
+  						),
+  					),
+  					box(width = 6,	 
+  					    actionButton("fuzzy_btn", "Borrosificar")
+  					), 
+  					h3(" "),
+  					box(
+  					  width = 12,  # Ancho de la caja (en una escala de 12 columnas)
+  					  h3("Tabla de Datos Borrosificada"), 
+  					  # Botón para descargar datos borrosificados en formato Xlsx
+  					  downloadButton(
+  					    outputId = "download_Xls",  # Identificador del botón de descarga
+  					    label = "Descargar datos borrosificada en Xlsx"  # Etiqueta del botón
+  					  ),
+  					  # Contenedor para la tabla de datos con un spinner de carga
+  					  shinycssloaders::withSpinner(
+  					    DTOutput("fuzzy_table")  # Salida de la tabla con identificador 'fuzzy_table'
+  					  )
+  					)
+  			)
+  )
+)
+
+## App completo ----------------------------------------------------------------
+ui <- dashboardPage(
+  skin = "green",  # Establece el tema de color del dashboard a verde
+  header,  # Define el encabezado del dashboard
+  sidebar,  # Define la barra lateral del dashboard
+  body  # Define el cuerpo del dashboard
+)
+
+ server <- function(input, output) {
+
+   # Inicializa una variable reactiva para almacenar datos como una lista
+   datos <- reactiveVal(list())
+   # Inicializa una variable reactiva para almacenar factores (inicialmente NULL)
+   factores <- reactiveVal(NULL)
+   # Inicializa una variable reactiva para almacenar un dataframe (inicialmente NULL)
+   df <- reactiveVal(NULL)
+   # Inicializa una variable reactiva para almacenar un vector de etiquetas ingresadas por el usuario
+   etiquetas <- reactiveVal(c())
+   # Inicializa una variable reactiva para almacenar un vector de intervalos
+   intervalos <- reactiveVal(c())
+   # Inicializa una variable reactiva para almacenar un valor (inicialmente NULL)
+   e <- reactiveVal(NULL)
+   # Inicializa una variable reactiva para almacenar un historial como una lista
+   historial <- reactiveVal(list())
+   # Inicializa una variable reactiva para almacenar una tabla de resultados (inicialmente NULL)
+   tabla_resultados <- reactiveVal(NULL)
+   
+   # Cargar datos
+   # Observa el evento de carga de un archivo (input$file)
+   observeEvent(input$file, {
+     # Lee el archivo CSV cargado por el usuario con las opciones especificadas
+     df(read.csv(input$file$datapath, 
+                 header = input$header,  # Indica si el archivo tiene encabezado
+                 dec = input$dec,        # Define el separador de decimales
+                 sep = input$sep,        # Define el separador de campos
+                 stringsAsFactors = TRUE, # Convierte cadenas en factores
+                 row.names = 1           # Usa la primera columna como nombres de fila
+     ))
+     # Identificar columnas que son factores en el dataframe
+     fact <- as.data.frame(df()[, sapply(df(), is.factor), drop = FALSE])
+     # levels() se usa para detectar las modalidades de un vector factor
+     # Separar columnas numéricas que no son factores
+     n <- as.data.frame(df()[, sapply(df(), function(x) is.numeric(x) && !is.factor(x)), drop = FALSE])
+     # Para asegurar que el nombre de la variable se mantenga incluso cuando hay solo una columna, 
+     # puedes usar el argumento drop = FALSE al extraer las columnas numéricas
+     # Convierte columnas relevantes a numéricas si es necesario
+     f <- as.data.frame(lapply(fact, as.double))
+     # Actualiza el selectInput de variables con las columnas numéricas y convertidas
+     updateSelectInput(getDefaultReactiveDomain(), 
+                       inputId = "variable", 
+                       choices = c(names(n), names(f)), 
+                       selected = NULL
+     )
+     # Actualiza la variable reactiva 'factores' con las columnas de factores
+     factores(fact)
+     # Actualiza la variable reactiva 'datos' con listas de columnas cuantitativas y cualitativas
+     datos(list(cuanti = n, cuali = f))
+   })
+   
+   # Mostrar la tabla de datos original
+   output$originalTable <- DT::renderDataTable({
+     # Requiere que se haya cargado un archivo (input$file)
+     req(input$file)
+     # Combina las columnas cuantitativas y cualitativas almacenadas en 'datos'
+     DT::datatable(
+       cbind(datos()$cuanti, datos()$cuali),  # Une las columnas cuantitativas y cualitativas
+       options = list(scrollX = TRUE)  # Habilita el desplazamiento horizontal
+     )
+   })
+   
+   # Mostrar Estadísticas de la tabla numérica
+   output$estadi <- renderPrint({
+     # Requiere que se haya cargado un archivo (input$file)
+     req(input$file)
+     # Genera un resumen estadístico de las columnas cuantitativas
+     summary(datos()$cuanti)
+   })
+   
+   # Gráfico de histogramas usando DataExplorer::plot_histogram
+   output$histo <- renderPlot({
+     # Requiere que se haya cargado un archivo (input$file)
+     req(input$file)
+     # Genera histogramas de las columnas numéricas, con 2 columnas por defecto
+     DataExplorer::plot_histogram(datos()$cuanti, ncol = 2L)
+   })
+   
+   # Matriz de correlación usando DataExplorer::plot_correlation
+   output$corre <- renderPlot({
+     # Requiere que se haya cargado un archivo (input$file)
+     req(input$file)
+     # Genera una matriz de correlación de las columnas numéricas
+     DataExplorer::plot_correlation(datos()$cuanti)
+   })
+   
+   # Gráfico de barras usando xray::distributions para variables cualitativas
+   output$bar_char <- renderPlot({
+     # Requiere que 'input$nominales' sea verdadero
+     req(input$nominales)
+     if (input$nominales) {
+       # Genera gráficos de barras para las columnas cualitativas
+       xray::distributions(datos()$cuali)
+     }
+   })
+   
+   # Mostrar referencias de variables nominales
+   output$modalidades <- renderPrint({
+     # Requiere que se haya cargado un archivo (input$file) y que 'input$nominales' sea verdadero
+     req(input$file, input$nominales)
+     if (input$nominales) {
+       # Crea un diccionario de modalidades para cada variable factor
+       diccionario_modalidades <- lapply(factores(), function(variable) {
+         if (is.factor(variable)) {
+           modalidades <- levels(variable)
+           return(modalidades)
+         }
+         return(NULL)
+       })
+       diccionario_modalidades
+     }
+   })
+   
+   observeEvent(input$save, {
+     req(input$numeric_vector) # Asegura que la entrada no sea NULL
+     # Divide la cadena en una lista por las comas y convierte a vector numérico
+     # Dividir la cadena por las comas y convertir a números
+     input_rangos <- as.numeric(unlist(strsplit(input$numeric_vector, ",")))
+     # Crear el vector
+     numeric_intervals <- c(input_rangos)
+     intervalos(numeric_intervals)
+     # Dividir y guardar las etiquetas
+     etiquetas(strsplit(input$label_input, ",")[[1]])
+   })
+   
+   # Detalle de los rangos
+   output$desc_intervalos <- renderTable({
+        req(intervalos())
+        limites <- intervalos()  #vector con limites cerrados de rangos
+        if (length(limites) < 2) {
+          stop("No hay suficientes límites para formar intervalos")
+        }
+        if(input$tipo_set == "Triangular"){
+          # Funcion triangular
+          tr <- data.frame(
+            Minimo = head(limites, -1), # Excluye el último elemento
+            Maximo = tail(limites, -1), # Excluye el primer elemento
+            b = (limites[-length(limites)] + limites[-1]) / 2,  # Punto central del intervalo
+            a = c(limites[1], head((limites[-length(limites)] + limites[-1]) / 2, -1)),  # Desfase de b para obtener a
+            c = c(tail((limites[-length(limites)] + limites[-1]) / 2, -1), limites[length(limites)])  # Desfase de b para obtener c
+          )
+          # Ajustes específicos para el primer y último intervalo
+          primero <- 1
+          ultimo <- length(limites)-1
+          # Ajusto los extremos
+          tr$b[primero] <- tr$a[primero]
+          tr$b[ultimo] <- tr$c[ultimo]
+          tr$etiquetas <-etiquetas() # Añade las etiquetas a la tabla
+        }else {
+          # Funcion Gaussiana
+          tr <- data.frame(
+            Minimo = head(limites, -1), # Excluye el último elemento
+            Maximo = tail(limites, -1), # Excluye el primer elemento
+            # Calcular 'a' como el promedio de límites consecutivos
+            a = (head(limites, -1) + tail(limites, -1)) / 2,
+            # Calcular 'b' como la mitad de la diferencia entre límites consecutivos
+            b = (tail(limites, -1) - head(limites, -1)) / 2
+          )
+          # Ajustes para los valores extremos de 'a' y 'b'
+          primero <- 1
+          ultimo <- length(limites)-1
+          # Ajuste para el primer y último valor de 'a'
+          tr$a[primero]<-tr$Minimo[primero]
+          tr$a[ultimo]<-tr$Maximo[ultimo]
+          tr$b[primero]<-tr$b[primero]*2
+          tr$b[ultimo]<-tr$b[ultimo]*2
+          tr$etiquetas <-etiquetas() # Añade las etiquetas a la tabla
+        }
+        tabla_resultados(tr)
+        tr
+   }, rownames = TRUE)     
+   
+   output$downloadData <- downloadHandler(
+     filename = function() {
+       paste("Conjuntos_", input$variable, ".txt", sep = "")
+     },
+     content = function(file) {
+       # Obtener los datos que se mostrarán
+       datos_intervalos = tabla_resultados()
+       # Escribir los datos en un archivo de texto
+       sink(file)
+       cat("\nDetalles de los Rangos:\n")
+       print(datos_intervalos)
+       sink()  
+     }
+   )
+    # Grafico variable
+    output$var_plot <- renderPlot({
+      req(tabla_resultados())
+      da <- as.data.frame(cbind(datos()$cuanti, datos()$cuali))
+      variable_name <- names(da[input$variable])
+      conjuntos <- tabla_resultados()
+      gradiente <- nrow(conjuntos)
+      min <- input$min
+      max <- input$max
+      x_vals <- seq(min, max, length.out = 10000)
+      titulo  <- switch(input$tipo_set,
+                        "Gaussiana" =  "Funciones Gaussianas",
+                        "Triangular" = "Funciones Triangulares" 
+      )
+    # Ajustar el límite superior del eje y para dar más espacio a las etiquetas
+    ylim_max <- 1.1
+    # Crear una paleta de colores personalizados
+    custom_palette <- c("red","darkred","darkviolet","darkblue", "darkgreen","royalblue",
+                        "darkorange", "darkcyan", "magenta")    
+    # Asignar colores, repitiendo si es necesario
+    colores <- rep(custom_palette, length.out = gradiente)
+    # Creo el gráfico
+      plot(x_vals, 
+           rep(0, length(x_vals)), 
+           type = "n", 
+           xlab = "Valor de x", 
+           ylab = "Función pertenencia", 
+           ylim = c(0, 1),
+           xlim = c(min,max),
+           main = paste(titulo, variable_name, "\n")
+      )
+      # Agregar cada función al gráfico
+      for (i in 1:gradiente) {
+        y_vals <- switch(input$tipo_set,
+                         "Gaussiana" =  gaussiana(x_vals, conjuntos[i, "a"], conjuntos[i, "b"]),
+                         "Triangular" = triangular(x_vals, conjuntos[i, "a"], conjuntos[i, "b"], conjuntos[i, "c"]) 
+        )
+        lines(x_vals, y_vals, col = colores[i], lwd = 2)
+      }
+      })
+    
+    # Borrosificación
+    observeEvent(input$fuzzy_btn, {
+      # Requiere que la tabla de resultados esté definida
+      req(tabla_resultados())
+      # Combina las columnas cuantitativas y cualitativas en un dataframe
+      da <- as.data.frame(cbind(datos()$cuanti, datos()$cuali))
+      # Obtiene el nombre de la variable seleccionada por el usuario
+      variable_name <- names(da[input$variable])
+      # Obtiene los conjuntos borrosos desde la tabla de resultados
+      conjuntos <- tabla_resultados()
+      # Calcula el número de gradientes (número de filas en la tabla de conjuntos)
+      gradiente <- nrow(conjuntos)
+      # Realizar la inferencia difusa
+      inferencia_resultado <- data.frame(
+        lapply(1:gradiente, function(i) {
+          # Genera una función de membresía gaussiana para el conjunto actual
+          mf <- genmf('gaussmf', c(conjuntos$b[i], conjuntos$a[i]))
+          # Evalúa la función de membresía para la variable seleccionada y redondea los resultados
+          round(evalmf(da[[variable_name]], mf), 4)
+        })
+      )
+      # Asigna las etiquetas a las columnas de los resultados de la inferencia difusa
+      colnames(inferencia_resultado) <- etiquetas()
+      # Actualiza el historial con los datos borrosificados y la variable original
+      historial(list(
+        data_fuzzy = inferencia_resultado,  # Datos borrosificados
+        var_orig = da[input$variable],      # Variable original
+        nombre_variable = variable_name     # Nombre de la variable
+      ))
+    })
+    
+      # Visualización de Tabla con números borrosos
+      output$fuzzy_table <- DT::renderDataTable({
+        req(historial()$data_fuzzy)
+        result <- tryCatch(
+          expr = {
+            # Código que puede generar un error
+            o <- historial()$var_orig
+            f <- round(historial()$data_fuzzy,4)
+            DT::datatable(data.frame(o,f), 
+                          options = list(scrollX = TRUE))
+          },
+          error = function(e) {
+            showModal(modalDialog(
+              title = "Error en Visualización de Tabla con números borrosos",
+              paste("Se ha producido un error en la visualización de resultados"),
+              easyClose = TRUE
+            ))
+          }
+        )
+      })
+      
+      # Guardar los resultados de la borrosificación en fichero
+      output$download_Xls <- downloadHandler(
+        filename = function() {
+          paste(historial()$nombre_variable, "_Fuzzy.csv")
+        },
+        content = function(file) {
+          o <- historial()$var_orig
+          f <-as.data.frame.matrix(historial()$data_fuzzy)
+          if(!is.null(factores())){
+            r <- data.frame(f,as.data.frame(factores()))
+          }else{
+            r <- data.frame(f)
+          }
+          # Ajusta el formato de los valores en notación científica y el separador decimal
+          r[] <- lapply(r, function(x) {
+            if (is.numeric(x)) {
+              format(x, scientific = TRUE, digits = 15)
+            } else {
+              x
+            }
+          })
+          # Guarda el Data Frame en un archivo CSV
+          write.csv2(r, file, row.names = TRUE)
+        }
+      )
+      
+      # Detiene la aplicación Shiny cuando se presiona el botón de salida
+      observeEvent(input$exit_btn, {
+        stopApp()  
+      })
+}
+
+shinyApp(ui, server)
