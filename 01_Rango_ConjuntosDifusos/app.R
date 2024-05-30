@@ -123,7 +123,6 @@ lapply(libraries, library, character.only = TRUE)
   						# Caja de ancho 6 que contiene una salida de imagen
   						box(
   						  width = 6,  # Ancho de la caja (en una escala de 12 columnas)
-  						  
   						  # Salida de imagen con identificador 'funcionM'
   						  imageOutput(
   						    outputId = "funcionM",  # Identificador de la salida de imagen
@@ -137,7 +136,7 @@ lapply(libraries, library, character.only = TRUE)
   						  # Salida de gráfico con identificador 'var_plot'
   						  plotOutput(
   						    outputId = 'var_plot',  # Identificador de la salida del gráfico
-  						    width = "80%",          # Ancho del gráfico (80% del contenedor)
+  						    width = "90%",          # Ancho del gráfico (80% del contenedor)
   						    height = "250px"        # Alto del gráfico en píxeles
   						  )
   						),
@@ -331,6 +330,18 @@ ui <- dashboardPage(
          theme(axis.text.x = element_text(angle = 45, hjust = 1))
      }
    })
+   # Muestra la imagen correspondiente a la función seleccionada.
+   output$funcionM <- renderImage({
+     switch(input$tipo_set,
+            "Gaussiana" =  ruta_relativa <- file.path("imagenes", "gaussiana.png"),
+            "Triangular" = ruta_relativa <- file.path("imagenes", "triangular.png") 
+     )
+     # Devolver la información de la imagen
+     list(src = ruta_relativa,
+          contentType = "png",
+          width = 250,
+          height = 120)
+   }, deleteFile = FALSE)  # Establecer delete File a FALSE para no eliminar la imagen temporalmente
    
    observeEvent(input$save, {
      req(input$numeric_vector) # Asegura que la entrada no sea NULL
@@ -341,7 +352,14 @@ ui <- dashboardPage(
      numeric_intervals <- c(input_rangos)
      intervalos(numeric_intervals)
      # Dividir y guardar las etiquetas
-     etiquetas(strsplit(input$label_input, ",")[[1]])
+       # Paso 1: Separar las entradas
+       raw_names <- strsplit(input$label_input, ",")[[1]]
+       # Paso 2: Limpiar y validar los nombres
+       cleaned_names <- sapply(raw_names, function(name) {
+         name <- gsub("[[:space:].(){}\\[\\]]", "", name)  # Eliminar caracteres no deseados
+         make.names(name, unique = TRUE)  # Convertir en nombre válido y único
+       })
+     etiquetas(cleaned_names)
    })
    
    # Detalle de los rangos
@@ -475,13 +493,12 @@ ui <- dashboardPage(
           })
         )
       }
-      # Asigna las etiquetas a las columnas de los resultados de la inferencia difusa
-      colnames(inferencia_resultado) <- etiquetas()
+      colnames(inferencia_resultado) <-  etiquetas()
       # Actualiza el historial con los datos borrosificados y la variable original
       historial(list(
-        data_fuzzy = inferencia_resultado,  # Datos borrosificados
-        var_orig = da[input$variable],      # Variable original
-        nombre_variable = variable_name     # Nombre de la variable
+        data_fuzzy = inferencia_resultado, # Datos borrosificados
+        var_orig = da[input$variable],     # Variable original
+        nombre_variable = variable_name    # Nombre de la variable
       ))
     })
     
@@ -490,7 +507,6 @@ ui <- dashboardPage(
         req(historial()$data_fuzzy)
         result <- tryCatch(
           expr = {
-            # Código que puede generar un error
             o <- historial()$var_orig
             f <- round(historial()$data_fuzzy,4)
             DT::datatable(data.frame(o,f), 
@@ -512,10 +528,10 @@ ui <- dashboardPage(
           paste(historial()$nombre_variable, "_Fuzzy.csv")
         },
         content = function(file) {
-          o <- historial()$var_orig
           f <-as.data.frame.matrix(historial()$data_fuzzy)
           if(!is.null(factores())){
             r <- data.frame(f,as.data.frame(factores()))
+            print(r)
           }else{
             r <- data.frame(f)
           }
@@ -527,6 +543,7 @@ ui <- dashboardPage(
               x
             }
           })
+         
           # Guarda el Data Frame en un archivo CSV
           write.csv2(r, file, row.names = TRUE)
         }
