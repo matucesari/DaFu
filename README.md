@@ -17,13 +17,13 @@
 
 ## Funciones
 ### Visualización y Análisis de Datos
-Descripción: Esta aplicación permite cargar y visualizar datos, facilitando la exploración a través de gráficos y tablas interactivas. Ofrece también análisis específicos como la generación de variables difusas y su respectiva visualización.
+Esta aplicación permite cargar y visualizar datos, facilitando la exploración a través de gráficos y tablas interactivas. Ofrece también análisis específicos como la generación de variables difusas y su respectiva visualización.
 
-### Transformación y Análisis de Variables
-Descripción: Facilita la transformación de variables numéricas en variables categóricas difusas, diseñando nuevas características que pueden ser útiles para modelados más complejos.
+### Partición univariada difusa y Transformación a números borrosos
+Facilita la transformación de variables numéricas en variables categóricas difusas, diseñando nuevas características que pueden ser útiles para modelados más complejos.
 
 ### Exportación de Resultados
-Descripción: Permite interactuar con los datos transformados y exportar los resultados en formatos como CSV para su uso posterior o análisis en otros software.
+Permite interactuar con los datos transformados y exportar los resultados en formatos como CSV para su uso posterior o análisis en otros software.
 
 ## Notas Generales
 Asegúrate de tener la última versión de R y RStudio.
