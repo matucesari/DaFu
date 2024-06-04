@@ -41,8 +41,8 @@ Cada directorio dentro del repositorio contiene una aplicación Shiny específic
 ### **00_CrearConjuntosDifusos:**
 **Funcionalidad**: Esta aplicación Shiny en R está diseñada para permitir a los usuarios trabajar de manera interactiva con conjuntos difusos a través de funciones de membresía específicas, como las gaussianas y triangulares. A continuación, se describen las principales características de esta aplicación:
 * **Creación de Conjuntos Difusos**
--- Parámetros Configurables: Los usuarios pueden ingresar de forma dinámica los parámetros necesarios para definir cada conjunto difuso. Esto incluye parámetros como el centro, la amplitud y la desviación estándar para las funciones gaussianas, así como los puntos de inicio, pico y fin para las triangulares.
--- Visualización Individual de Conjuntos: Una vez definidos los parámetros, los usuarios pueden visualizar gráficamente cada conjunto difuso de forma individual. Esto facilita la comprensión inmediata de las características y la forma de cada función de membresía aplicada.
+	- Parámetros Configurables: Los usuarios pueden ingresar de forma dinámica los parámetros necesarios para definir cada conjunto difuso. Esto incluye parámetros como el centro, la amplitud y la desviación estándar para las funciones gaussianas, así como los puntos de inicio, pico y fin para las triangulares.
+	- Visualización Individual de Conjuntos: Una vez definidos los parámetros, los usuarios pueden visualizar gráficamente cada conjunto difuso de forma individual. Esto facilita la comprensión inmediata de las características y la forma de cada función de membresía aplicada.
 * **Construcción de Variables Lingüísticas Difusas**
 - Combinación de Conjuntos: Los usuarios pueden combinar varios conjuntos difusos para formar una variable lingüística difusa completa.
 - Visualización de Variables Lingüísticas: La variable lingüística completa puede visualizarse a través de una interfaz web externa especializada en graficado de funciones. Esto permite a los usuarios ver cómo los conjuntos individuales se integran para formar la variable completa.
