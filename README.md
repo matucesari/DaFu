@@ -1,3 +1,5 @@
+![image](https://github.com/matucesari/DaFu/assets/85371512/e69e782f-708d-4873-813c-8dca2146e6f1)
+
 # DaFu (Data Fuzzy) Análisis de Datos imprecisos con Lógica borrosa
 ## Descripción de las Aplicaciones Shiny de Lógica Borrosa
 Este documento presenta un conjunto de cuatro aplicaciones desarrolladas en Shiny para R, diseñadas para facilitar la implementación de diversas funcionalidades asociadas a la metodología de lógica borrosa en el análisis de datos. Estas aplicaciones proveen un enfoque interactivo y profundo para la gestión y análisis de conjuntos difusos, adecuado para investigadores y profesionales en áreas como estadística, ciencia de datos, e ingeniería que requieran métodos avanzados para la manipulación de incertidumbres y datos vagos.
@@ -5,7 +7,8 @@ Este documento presenta un conjunto de cuatro aplicaciones desarrolladas en Shin
 ## Estructura de las Aplicaciones en el Repositorio
 El repositorio DaFu, podría estar estructurado de la siguiente manera:
 ```
-README.md: Un archivo de descripción que ofrece información sobre el proyecto, cómo instalar y ejecutar el código.
+README.md: Un archivo de descripción que ofrece información sob![Romper11](https://github.com/matucesari/DaFu/assets/85371512/073f565a-6496-455a-8074-d775113bc1b4)
+re el proyecto, cómo instalar y ejecutar el código.
 00_CrearConjuntosDifusos/
 	imagenes/
 		ejemplo diagrama Foot.png
