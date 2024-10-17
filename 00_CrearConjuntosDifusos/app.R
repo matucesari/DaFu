@@ -15,23 +15,23 @@ graficar <- function(x, mf, tipo){
     # Si 'mf' existe, se procede a graficar  
     # Utilizar la función 'plot' para crear la gráfica
     plot(x,            # Eje X: Datos de entrada 'x'
-         mf,           # Eje Y: Grado de membresía 'mf'
+         mf,           # Eje Y: Grado de pertenencia 'mf'
          type = "l",   # Tipo de gráfica: línea ('l')
          xlab = "x",   # Etiqueta del eje X: 'x'
-         ylab = "Grado de membresía", # Etiqueta del eje Y
+         ylab = "Grado de pertenencia", # Etiqueta del eje Y
          col = "purple", # Color de la línea: púrpura
          lwd=2,        # Ancho de la línea: 2
-         main = paste("Función ", tipo) # Título de la gráfica, combinando "Función" con el valor de 'tipo'
+         main = paste("Función de pertenencia ", tipo) # Título de la gráfica, combinando "Función" con el valor de 'tipo'
     )
-    # Esta gráfica mostrará cómo varía el grado de membresía de 'mf' con respecto a 'x',
-    # lo cual es útil para visualizar funciones de membresía en lógica difusa, por ejemplo.
+    # Esta gráfica mostrará cómo varía el grado de pertenencia de 'mf' con respecto a 'x',
+    # lo cual es útil para visualizar funciones de pertenencia en lógica difusa, por ejemplo.
   }
   # Si 'mf' es NULL, la función no realiza ninguna acción/gráfica.
 }
 
 # Define la interfaz de usuario de Shiny
   # Encabezado --------------------------------------------------------------
-  header <- dashboardHeader( title="Definir conjuntos difusos y aplicar la función de membresía" )
+  header <- dashboardHeader( title="Definir conjuntos difusos y aplicar la función de pertenencia" )
 
   # Crear la barra lateral (sidebar) de un dashboard------------------------
    sidebar <- dashboardSidebar(
@@ -49,9 +49,9 @@ graficar <- function(x, mf, tipo){
 	    menuItem("Borrosificación", 
                tabName = "borro", 
                icon = icon("list-alt"))
-    ),
+    )
     # Incluir un botón de acción para 'Salir' de alguna funcionalidad o de la app
-    actionButton("exit_btn", "Salir")    
+    # actionButton("exit_btn", "Salir")    
   )
   
   # Cuerpo principal de la aplicación Shiny------------------------
@@ -61,22 +61,22 @@ graficar <- function(x, mf, tipo){
         # Primera pestaña: Carga y visualización de datos originales
   		tabItem(
   			tabName = "datos_ori",
-  			h2("Carga de fichero CSV"), 
+  			h2("Carga de fichero CSV con tabla de Datos"), 
   			box(width = 12,
   				      # Instrucciones para el usuario
-  				      h5("La tabla CSV DEBE tener en 1º coluna: etiqueta de observaciones ID"), 
+  				      h5("La tabla CSV DEBE tener en 1er columna: etiqueta de observaciones (ID único de fila)"), 
   				      # Interruptores para especificar características del archivo CSV
-  				      materialSwitch(inputId = "header", "El archivo tiene encabezado", value = TRUE),
-  				      materialSwitch(inputId = "nominales", "La tabla tiene Variables Categóricas Nominales", value = FALSE),
+  				      materialSwitch(inputId = "header", "El archivo TIENE Encabezados de columnas", value = TRUE),
+  				      materialSwitch(inputId = "nominales", "La tabla CONTIENE Variables Categóricas Nominales", value = FALSE),
   				      # Opciones para especificar el formato del archivo CSV
-  				      radioButtons("sep", "Separador de campos:", choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), selected = ";"),
+  				      radioButtons("sep", "Separador de columnas:", choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), selected = ";"),
   				      radioButtons("dec", "Separador decimal:", choices = c(Coma = ",", Punto = "."), selected = '.'),
-  				      fileInput("file", "Selecciona un archivo CSV:", accept = ".csv")
+  				      fileInput("file", "Selecciona un fichero CSV:", accept = ".csv")
   			),
   			h2("Datos Originales"),
   			# Visualización de estadísticas y datos originales
   			 box(width = 12,
-  				h3("Estadísitcas de las Variables Cuantitativas"),
+  				h3("Estadísticas de las Variables Cuantitativas"),
   				verbatimTextOutput("estadi")
   			 ),
   			h3("Tabla de Datos"),
@@ -86,16 +86,16 @@ graficar <- function(x, mf, tipo){
   		tabItem(
   			 tabName = "var_fuzzy",
          # Configuración para la selección y borrosificación de variables
-  			 h3("Variable observada a Variable Difusa"),
-  			 selectInput("variable", "Selección Variable a Fuzzyficar:", choices = NULL),
+  			 h3("Variable Original a Variable Difusa"),
+  			 selectInput("variable", "Selección Variable a Borrosificar:", choices = NULL),
   			 actionButton("botonFuzzyficar", "Fuzzyficar"),
          # Contenedor para el diseño de la variable difusa
   			 box(
   				width = 12,
   				column(
       				   width = 5, 
-      				   title = "Definir Función membresia",
-      				   h5("Elija para un conjunto difuso tipo de función de pertenecia"), 
+      				   title = "Definir Función Pertenencia",
+      				   h5("Elija, para un conjunto difuso, tipo de función de pertenecia"), 
       				   awesomeRadio(
       				        	inputId = "tipo_set",
       				        	label = "Radio buttons", 
@@ -125,9 +125,9 @@ graficar <- function(x, mf, tipo){
       				        h5("tri_mf presenta parámetros (a, b, c), donde a y c localiza los pies del triángulo y b localiza el pico")
       			      ),
       			  	h3(),
-      			  	h5("Antes de añadir un conjunto coloque una etiqueta linguistica"), 
+      			  	h5("Antes de añadir un conjunto coloque una etiqueta lingüística"), 
       			  	textInput("nombre_mf", "Etiqueta conjunto difuso para añadir a la VD: "),
-      			  	h5("Fórmula para graficar abajo: "),
+      			  	h5("Fórmula para graficar con app abajo: "),
       			  	verbatimTextOutput("vf"), 
       			  	h3()
   			    ),
@@ -140,7 +140,7 @@ graficar <- function(x, mf, tipo){
         				  box( width = 7, 
           				       plotOutput( outputId = 'plot',width = "90%",height = "250px"),
           				       h4(),
-          				       h5("Con el graficador de abajo puede ver en simultanea todos los conjuntos"), 
+          				       h5("Con el graficador de abajo, puede ver en simultanea todos los conjuntos"), 
           				       h5("ANTES de AÑADIR, revise todos los conjuntos y los agrega uno por uno"), 
           				       h5("No es posible borrar conjuntos agregados, debera comenzar de nuevo")
         				  ),
@@ -165,7 +165,7 @@ graficar <- function(x, mf, tipo){
   			    # Botón para descargar datos borrosificados en formato Xlsx
   			    downloadButton(
   			      outputId = "download_Xls",  # Identificador del botón de descarga
-  			      label = "Descargar datos borrosificada en Xlsx"  # Etiqueta del botón
+  			      label = "Descargar datos borrosificada en XLSx"  # Etiqueta del botón
   			    ),
   			    # Contenedor para la tabla de datos con un spinner de carga  			    
   			      DTOutput("fuzzy_table")  # Salida de la tabla con identificador 'fuzzy_table'
@@ -457,7 +457,7 @@ ui <- dashboardPage(
         variable_name <- names(da[input$variable])
          result <- tryCatch(
           expr = {
-            # Aplicamos la función de membresía de los conjuntos difusos
+            # Aplicamos la función de pertenencia de los conjuntos difusos
             inferencia <- evalmf(da[[variable_name]], temp()$c)
             resultados <- as.data.frame(inferencia)
             colnames(resultados) <-  temp()$e
@@ -523,9 +523,9 @@ ui <- dashboardPage(
       )    
             
      # Detiene la aplicación Shiny cuando se presiona el botón de salida.
-      observeEvent(input$exit_btn, {
-        stopApp()  
-      })  
+      #  observeEvent(input$exit_btn, {
+      #    stopApp()  
+      #  })  
 }
 
 shinyApp(ui, server)
