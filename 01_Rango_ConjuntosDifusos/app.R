@@ -11,15 +11,16 @@ lapply(libraries, library, character.only = TRUE)
 # Define la interfaz de usuario de Shiny
 
   # Encabezado --------------------------------------------------------------
-  header <- dashboardHeader( title="Definir conjuntos difusos y aplicar la función de membresía" )
+  header <- dashboardHeader( title="Definir conjuntos difusos y aplicar la función de pertenencia" )
 
   # Sidebar -----------------------------------------------------------------
   sidebar <- dashboardSidebar(
     sidebarMenu(
       menuItem("Tabla de Datos Original", tabName = "datos_ori", icon = icon("table")),
       menuItem("Borrosificación", tabName = "var_fuzzy", icon = icon("cog", lib = "glyphicon"))
-    ),
-    actionButton("exit_btn", "Salir")
+    )
+    #,
+    # actionButton("exit_btn", "Salir")
   )
   
   # Cuerpo ------------------------------------------------------------------
@@ -42,7 +43,7 @@ lapply(libraries, library, character.only = TRUE)
   				  h2("Datos Originales"),
   				  # Visualización de estadísticas y datos originales
   				  box(width = 12,
-  				      h3("Estadísitcas de las Variables Cuantitativas"),
+  				      h3("Estadísticas de las Variables Cuantitativas"),
   				      verbatimTextOutput("estadi"),
   				      box(width = 12, 
   				          plotOutput("corre"),
@@ -53,7 +54,7 @@ lapply(libraries, library, character.only = TRUE)
   				      ),
   				      conditionalPanel(
   				        condition = "input.nominales == true",
-  				        h3("Estadísitcas de las Variables Cualitativas"),
+  				        h3("Estadísticas de las Variables Cualitativas"),
   				        plotOutput("bar_char")
   				      )
   				  ),
@@ -67,8 +68,8 @@ lapply(libraries, library, character.only = TRUE)
   					box(width = 12,
   						h3("Diseñar la Variable difusa"),   
   						column( width = 5,
-      							   title = "Definir Funciones de membresia",
-  						         h5("Elija para ltipo de función de pertenecia"), 
+      							   title = "Definir Funciones de pertenencia",
+  						         h5("Elija tipo de función de pertenecia"), 
   						        awesomeRadio(
   						          # Identificador del input
   						          inputId = "tipo_set",
@@ -104,8 +105,8 @@ lapply(libraries, library, character.only = TRUE)
   						        ),
   						        # Título con tamaño de encabezado 5 con ejemplos explicativos
   						        h5("Por ejemplo: si tengo tres intervalos [0a1], (1a3], y (3a5] "),
-  						        h5("Los limites cerrados son cuatro: 0, 1, 3 y 5"),
-  						        h5("Las etiquetas serán tres: bajo, medio y alto"),
+  						        h5("Los limites cerrados son cuatro(4): 0, 1, 3 y 5"),
+  						        h5("Las etiquetas serán tres(3): bajo, medio y alto"),
   						        # Input de texto para las etiquetas de los conjuntos
   						        textInput(
   						          inputId = "label_input",      # Identificador del input
@@ -156,7 +157,7 @@ lapply(libraries, library, character.only = TRUE)
   					  # Botón para descargar datos borrosificados en formato Xlsx
   					  downloadButton(
   					    outputId = "download_Xls",  # Identificador del botón de descarga
-  					    label = "Descargar datos borrosificada en Xlsx"  # Etiqueta del botón
+  					    label = "Descargar datos borrosificada en XLSx"  # Etiqueta del botón
   					  ),
   					  # Contenedor para la tabla de datos con un spinner de carga
   					  shinycssloaders::withSpinner(
@@ -550,9 +551,9 @@ ui <- dashboardPage(
       )
       
       # Detiene la aplicación Shiny cuando se presiona el botón de salida
-      observeEvent(input$exit_btn, {
-        stopApp()  
-      })
+      # observeEvent(input$exit_btn, {
+      #   stopApp()  
+      # })
 }
 
 shinyApp(ui, server)
