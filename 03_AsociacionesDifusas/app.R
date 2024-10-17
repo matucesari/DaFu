@@ -22,8 +22,9 @@ source("dellNULMarg.R")
     sidebarMenu(
       menuItem("Tabla de Datos Original", tabName = "datos_ori", icon = icon("table")),
       menuItem("Caracterización Valor de Test", tabName = "texto", icon = icon("list-alt"))
-    ),
-    actionButton("exit_btn", "Salir")
+    )
+    #,
+    #actionButton("exit_btn", "Salir")
   )
   
   # Cuerpo ------------------------------------------------------------------
@@ -448,9 +449,9 @@ server <- function(input, output) {
   )
   
  # Detiene la aplicación Shiny cuando se presiona el botón de salida
-  observeEvent(input$exit_btn, {
-    stopApp()  
-  })
+  #observeEvent(input$exit_btn, {
+  #  stopApp()  
+  #})
 }
 
 # Ejecutar la aplicación Shiny
