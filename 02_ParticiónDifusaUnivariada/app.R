@@ -18,7 +18,7 @@ lapply(libraries, library, character.only = TRUE)
 
 # Encabezado de la página con un título específico
 header <- dashboardHeader(
-  title="Crear Conjuntos difusos de partición Variable en Clases Óptimas")
+  title="Crear Conjuntos difusos a partir de partición en Clases Óptimas")
 
 # Barra lateral de navegación que contiene menús 
 # para diferentes secciones de la aplicación
@@ -36,9 +36,10 @@ sidebar <- dashboardSidebar(
     menuItem("Partición y LD", 
              tabName = "parti", 
              icon = icon("list-alt"))
-  ),
+  )
+  #,
   # Botón para salir de la aplicación
-  actionButton("exit_btn", "Salir")
+  # actionButton("exit_btn", "Salir")
 )
 
 # Cuerpo de la interfaz de usuario, que contiene los elementos visuales
@@ -57,17 +58,17 @@ body <- dashboardBody(
           # Instrucciones para el usuario
           h5("La tabla CSV DEBE tener en 1º coluna: etiqueta de observaciones ID"), 
           # Interruptores para especificar características del archivo CSV
-          materialSwitch(inputId = "header", "El archivo tiene encabezado", value = TRUE),
-          materialSwitch(inputId = "nominales", "La tabla tiene Variables Categóricas Nominales", value = FALSE),
+          materialSwitch(inputId = "header", "El archivo tiene Encabezado", value = TRUE),
+          materialSwitch(inputId = "nominales", "La tabla contiene Variables Categóricas Nominales", value = FALSE),
           # Opciones para especificar el formato del archivo CSV
-          radioButtons("sep", "Separador de campos:", choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), selected = ";"),
+          radioButtons("sep", "Separador de columnas:", choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), selected = ";"),
           radioButtons("dec", "Separador decimal:", choices = c(Coma = ",", Punto = "."), selected = '.'),
           fileInput("file", "Selecciona un archivo CSV:", accept = ".csv")
       ),
       h2("Datos Originales"),
       # Visualización de estadísticas y datos originales
       box(width = 12,
-          h3("Estadísitcas de las Variables Cuantitativas"),
+          h3("Estadísticas de las Variables Cuantitativas"),
           verbatimTextOutput("estadi"),
           box(width = 12, 
               plotOutput("corre"),
@@ -78,7 +79,7 @@ body <- dashboardBody(
           ),
           conditionalPanel(
             condition = "input.nominales == true",
-            h3("Estadísitcas de las Variables Cualitativas"),
+            h3("Estadísticas de las Variables Cualitativas"),
             plotOutput("bar_char")
           )
       ),
@@ -97,7 +98,7 @@ body <- dashboardBody(
                           choices = NULL),
               numericInput("num_intervals", 
                            "Número de intervalos de clase:", 
-                           value = 5, min = 1),
+                           value = 5, min = 2),
               radioButtons("method", 
                            "Método de clasificación:", 
                            choices = c("Fisher", "K-means"), 
@@ -107,7 +108,7 @@ body <- dashboardBody(
                            value = 1, min = 0),
               # Botones y opciones adicionales
               actionButton("discretize_btn", "Discretizar"),
-              h5("Elija para ltipo de función de pertenecia"),
+              h5("Elija tipo de función de pertenecia"),
               awesomeRadio(
                 inputId = "tipo_set",
                 label = "Radio buttons",
@@ -126,7 +127,7 @@ body <- dashboardBody(
           h3(" "),
           box(width = 12,
               h3("Tabla de Datos Borrosificada"),
-              downloadButton("download_Xls", "Descargar datos borrosificada en Xlsx"),
+              downloadButton("download_Xls", "Descargar datos borrosificados en XLSx"),
               DTOutput("fuzzy_table")
           )
       )
@@ -518,9 +519,9 @@ server <- function(input, output) {
           }
         )
   # Detiene la aplicación Shiny cuando se presiona el botón de salida
-  observeEvent(input$exit_btn, {
-    stopApp()  
-  })
+   # observeEvent(input$exit_btn, {
+   #  stopApp()  
+   # })
 }
 
   
