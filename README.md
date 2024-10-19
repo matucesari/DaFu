@@ -1,4 +1,5 @@
 ![image](https://github.com/matucesari/DaFu/assets/85371512/e69e782f-708d-4873-813c-8dca2146e6f1)
+http://micesari.servehttp.com:3838/
 
 # DaFu (Data Fuzzy) Análisis de Datos imprecisos con Lógica borrosa
 ## Descripción de las Aplicaciones Shiny de Lógica Borrosa
