@@ -103,6 +103,8 @@ source("dellNULMarg.R")
                     condition = "input.tipo_desc == true",
                     downloadButton("download_descGFiltxt", "Descargar Descripcion Grupo Filas en TXT")
                   ),
+                 # Agrego un nuevo botón para la descarga del CSV combinado
+                 downloadButton("download_csv_combinado", "Descargar CSV Combinado"),
                  h3(" "),
                  box(width = 12,verbatimTextOutput("desc_results"))
           )
@@ -448,10 +450,165 @@ server <- function(input, output) {
     }
   )
   
- # Detiene la aplicación Shiny cuando se presiona el botón de salida
-  #observeEvent(input$exit_btn, {
-  #  stopApp()  
-  #})
+  # Función para separar la columna 'class' según el guion bajo
+  separar_class <- function(df) {
+    # Verificar si la columna 'class' tiene guiones bajos
+    if (any(grepl("_", df$class))) {
+      # Dividir la columna 'class' en múltiples columnas
+      class_parts <- strsplit(as.character(df$class), "_")
+      
+      # Calcular el número máximo de partes
+      max_parts <- max(sapply(class_parts, length))
+      
+      # Crear nombres para las nuevas columnas
+      column_names <- paste0("class_part_", seq_len(max_parts))
+      
+      # Convertir la lista a un dataframe con las columnas nuevas
+      class_df <- do.call(rbind, lapply(class_parts, function(x) {
+        # Rellenar con NA si hay menos partes
+        length(x) <- max_parts
+        return(x)
+      }))
+      
+      # Añadir las columnas al dataframe original
+      class_df <- as.data.frame(class_df, stringsAsFactors = FALSE)
+      names(class_df) <- column_names
+      df <- cbind(df, class_df)
+    }
+    
+    return(df)
+  }
+  
+ 
+  output$download_csv_combinado <- downloadHandler(
+    filename = function() {
+      paste("Descripcion_Resultados_Combinados.csv")
+    },
+    content = function(file) {
+      # Verifica si los resultados están disponibles
+      d <- resultados()
+      
+      if (is.null(d)) {
+        # Mostrar un modal indicando que no hay resultados si no se ha hecho el cálculo previo
+        showModal(modalDialog(
+          title = "Error",
+          "No hay resultados para descargar. Por favor, realiza la descripción antes de intentar descargar.",
+          easyClose = TRUE
+        ))
+        return()
+      }
+      
+      # Inicializar un dataframe vacío para almacenar los resultados del CSV
+      csv_data <- data.frame(
+        class = character(0),
+        caracteristica_asociada = character(0),  # Sin acento
+        Test_Value = numeric(0)
+      )
+      
+      # Si input$tipo_desc es TRUE, procesar d$grupo
+      if (input$tipo_desc) {
+        if (!is.null(d$grupo)) {
+          desc_df <- d$grupo
+          
+          # Recorrer cada clase en la descripción de grupos
+          for (class_name in names(desc_df)) {
+            # Obtener el dataframe asociado a la clase actual
+            class_data <- desc_df[[class_name]]
+            
+            if (is.data.frame(class_data)) {
+              # Recorrer cada fila del dataframe de la clase actual
+              for (i in 1:nrow(class_data)) {
+                caracteristica <- rownames(class_data)[i]
+                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
+                
+                # Añadir una nueva fila al dataframe csv_data
+                nueva_fila <- data.frame(
+                  class = class_name,
+                  caracteristica_asociada = caracteristica,
+                  Test_Value = test_value
+                )
+                csv_data <- rbind(csv_data, nueva_fila)
+              }
+            }
+          }
+          
+          # Separar la columna 'class' en múltiples columnas si tiene "_"
+          csv_data <- separar_class(csv_data)
+        }
+      } else {
+        # Si input$tipo_desc es FALSE, procesar d$filas y d$columnas
+        
+        # Procesar la descripción de filas
+        if (!is.null(d$filas)) {
+          desc_df <- d$filas
+          
+          # Recorrer cada clase en la descripción de filas
+          for (class_name in names(desc_df)) {
+            # Obtener el dataframe asociado a la clase actual
+            class_data <- desc_df[[class_name]]
+            
+            if (is.data.frame(class_data)) {
+              # Recorrer cada fila del dataframe de la clase actual
+              for (i in 1:nrow(class_data)) {
+                caracteristica <- rownames(class_data)[i]
+                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
+                
+                # Añadir una nueva fila al dataframe csv_data
+                nueva_fila <- data.frame(
+                  class = class_name,
+                  caracteristica_asociada = caracteristica,
+                  Test_Value = test_value
+                )
+                csv_data <- rbind(csv_data, nueva_fila)
+              }
+            }
+          }
+        }
+        
+        # Procesar la descripción de columnas
+        if (!is.null(d$columnas)) {
+          desc_df <- d$columnas
+          
+          # Recorrer cada clase en la descripción de columnas
+          for (class_name in names(desc_df)) {
+            # Obtener el dataframe asociado a la clase actual
+            class_data <- desc_df[[class_name]]
+            
+            if (is.data.frame(class_data)) {
+              # Recorrer cada fila del dataframe de la clase actual
+              for (i in 1:nrow(class_data)) {
+                caracteristica <- rownames(class_data)[i]
+                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
+                
+                # Añadir una nueva fila al dataframe csv_data
+                nueva_fila <- data.frame(
+                  class = class_name,
+                  caracteristica_asociada = caracteristica,
+                  Test_Value = test_value
+                )
+                csv_data <- rbind(csv_data, nueva_fila)
+              }
+            }
+          }
+        }
+      }
+      
+      # Verificar si csv_data tiene datos válidos antes de guardarlo
+      if (nrow(csv_data) == 0) {
+        showModal(modalDialog(
+          title = "Error en la Descripción",
+          "No se encontraron datos válidos para escribir en el CSV.",
+          easyClose = TRUE
+        ))
+        return()
+      }
+      
+      # Guardar el DataFrame en el archivo CSV
+      write.csv2(csv_data, file, row.names = FALSE)
+    }
+  )
+  
+
 }
 
 # Ejecutar la aplicación Shiny
