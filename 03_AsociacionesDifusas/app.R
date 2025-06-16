@@ -1,617 +1,321 @@
-# Librerías
-libraries <- c("shiny", "FactoMineR", "shinyWidgets", "shinydashboard", "xtable", "openxlsx", "factoextra", "ggthemes", "tvthemes", "dplyr", "tidyverse", "DT","htmlwidgets")
+# app.R
 
-# Instala los paquetes si no están instalados
+# ─── Librerías ──────────────────────────────────────────────────────────────
+libraries <- c(
+  "shiny", "caret", "FactoMineR", "shinyWidgets", "shinydashboard", "xtable",
+  "openxlsx", "factoextra", "ggthemes", "tvthemes", "dplyr", "tidyverse",
+  "DT", "htmlwidgets"
+)
 install.packages(setdiff(libraries, rownames(installed.packages())), dependencies = TRUE)
-
-# Cargar librerías
 lapply(libraries, library, character.only = TRUE)
 
-# Cargar funciones adicionales si es necesario
+# Cargar funciones auxiliares
 source("cluster.carac.R")
 source("escalar.R")
 source("dellNULMarg.R")
 
-# Define la interfaz de usuario de Shiny
 
-  # Encabezado --------------------------------------------------------------
-  header <- dashboardHeader( title="Asociaciones significativas de una Tabla de Contingencia" )
+# ─── UI ─────────────────────────────────────────────────────────────────────
+header <- dashboardHeader(title = "Asociaciones significativas de una Tabla de Contingencia")
 
-  # Sidebar -----------------------------------------------------------------
-  sidebar <- dashboardSidebar(
-    sidebarMenu(
-      menuItem("Tabla de Datos Original", tabName = "datos_ori", icon = icon("table")),
-      menuItem("Caracterización Valor de Test", tabName = "texto", icon = icon("list-alt"))
-    )
-    #,
-    #actionButton("exit_btn", "Salir")
-  )
-  
-  # Cuerpo ------------------------------------------------------------------
-  body <- dashboardBody(
-    tabItems(
-        tabItem(
-          tabName = "datos_ori",
-          h3("Carga de fichero CSV"), 
-          box(width = 12,
-            h5("Verificar notación científica en datos numéricos"),   
-            h5("Verificar y corregir caracteres especiales como acentos, la letra ü y la letra ñ "),   
-            h5("Verificar identificadores de fila únicos"),  
-            h5("------------------------"), 
-            h5("------------------------"), 
-            h3("OPCIONES para la carga del CSV"), 
-            materialSwitch(inputId = "header", "El archivo tiene encabezado", value = TRUE),
-            radioButtons("sep", "Separador de campos:", 
-                         choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"), 
-                         selected = ";"),
-            radioButtons("dec", "Separador decimal:", 
-                         choices = c(Coma = ",", Punto = "."), 
-                         selected = '.'),
-            h3(" "), 
-            materialSwitch(inputId = "escalar", "¿Desea escalar la Tabla?", value = TRUE),
-            # Seleccionar el archivo CSV
-            fileInput("file", "Selecciona un archivo CSV:", accept = ".csv"),
-            h3(" "), 
-          ),
-          h3("Tabla de Datos Original"), 
-          box(width = 12,
-                       DTOutput("originalTable")
-          )
-        ),
-        tabItem(
-           tabName = "texto",
-           h3("Caracterización Valor de Test"),  
-           fluidRow(
-                 sidebarPanel(
-                     materialSwitch("tipo_desc", "¿Agregacion por Por grupo de filas?", FALSE),  
-                     conditionalPanel(
-                       condition = "input.tipo_desc == true",
-                         pickerInput(
-                                   inputId = "grupo", 
-                                   label = "Seleccione Variables Agrupacion:", 
-                                   choices = NULL, 
-                                   options = pickerOptions(
-                                     actionsBox = TRUE, 
-                                     size = 4,
-                                     selectedTextFormat = "count > 3"
-                                   ), 
-                                   multiple = TRUE
-                          )
-                      ),
-                     actionButton("describirBtn", "Describir"),
-                 ),
-         box(width = 12,
-                downloadButton("download_tabla", "Descargar la tabla de contigencia escalada en CSV"),
-                h3(" "),
-                materialSwitch("con_afc", "¿Quieres realizar el AFCS?", TRUE),  
-                conditionalPanel(
-                   condition = "input.con_afc == true",
-                   h4("Análsis Factorial de Correspondencias Simples AFCS"), 
-                   plotOutput("afc"),
-                   downloadButton("download_ca", "Descargar Resumen del AFCS")
-                ),
-                 h4("Tabla Asociaciones"), 
-                 box(width = 6,imageOutput(outputId ="Vtest",height = 120)),
-                 h6("Se realiza una prueba correspondiente a la distribución hipergeométrica y se calcula la probabilidad de observar un valor más extremo que el observado. Para cada fila (o categoría), se ordenan en orden ascendente de valor de Test de cada una de las columnas que caracterizan la fila (asociación)"),
-                  h3(" "),
-                  conditionalPanel(
-                    condition = "input.tipo_desc == false",
-                    downloadButton("download_descFiltxt", "Descargar Descripcion Filas en TXT"),
-                    downloadButton("download_descColtxt", "Descargar Descripcion Columnas en TXT")
-                  ),
-                  conditionalPanel(
-                    condition = "input.tipo_desc == true",
-                    downloadButton("download_descGFiltxt", "Descargar Descripcion Grupo Filas en TXT")
-                  ),
-                 # Agrego un nuevo botón para la descarga del CSV combinado
-                 downloadButton("download_csv_combinado", "Descargar CSV Combinado"),
-                 h3(" "),
-                 box(width = 12,verbatimTextOutput("desc_results"))
-          )
-        )
-      )
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("Tabla de Datos Original",       tabName = "datos_ori", icon = icon("table")),
+    menuItem("Caracterización Valor de Test", tabName = "texto",     icon = icon("list-alt"))
   )
 )
-  
-  ## App completo ----------------------------------------------------------------
-  ui <- dashboardPage(
-    skin = "green",
-    header,
-    sidebar,
-    body
-  )
-  
 
-# Definir el servidor
-server <- function(input, output) {
-  
-  # Inicializa una variable reactiva para almacenar datos (inicialmente NULL)
-  datos <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar un dataframe (inicialmente NULL)
-  df <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar factores (inicialmente NULL)
-  factores <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar una tabla (inicialmente NULL)
-  tc <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar otra tabla (inicialmente NULL)
-  ttc <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar resultados (inicialmente NULL)
-  resu <- reactiveVal(NULL)
-  # Inicializa una variable reactiva para almacenar una lista de resultados
-  resultados <- reactiveVal(list())
-  # Inicializa un vector para almacenar grupos (inicialmente vacío)
-  grupo <- c()
-  # Inicializa un vector para almacenar índices (inicialmente vacío)
-  index <- c()
-  
-  observeEvent(input$file, {
-    req(input$file) # Asegurar que un archivo esté cargado
-    tryCatch({  
-        df(read.csv2(input$file$datapath, 
-                       fileEncoding = "UTF-8", # especificar la codificación de caracteres
-                       #locale = locale(encoding = "UTF-8")) %>%  type_convert() %>%  mutate(id = if_else(duplicated(id), paste(id, row_number(), sep = "_"), row.names),
-                       header = input$header, 
-                       row.names = 1,
-                       dec = input$dec, 
-                       sep = input$sep, 
-                       stringsAsFactors=TRUE
-                       ))
-        # Separar factores de números  
-        num <-df()[, sapply(df(), function(x) is.numeric(x) && !is.factor(x)), drop=FALSE]
-        
-        # Identificar columnas de factores
-        fact <- df()[, sapply(df(), is.factor), drop=FALSE]
-        names(fact) <- names(df())[sapply(df(), is.factor)]
-        factores((fact))
-        
-        # Actualizar opciones del menú desplegable
-        updatePickerInput(getDefaultReactiveDomain(), inputId = "grupo", choices = names(fact))
-        
-        datos(as.data.frame(num))
-        
-    }, error = function(e) {
-      showModal(modalDialog(
-        title = "Error en la carga del fichero",
-        "No se pudo cargar el fichero, revise formato del CSV y los parámetros ingresados",
-        easyClose = TRUE
-      ))
-    })
-  })
-  
-  output$originalTable <- DT::renderDataTable({
-    DT::datatable(df(), options = list(scrollX = TRUE))  # scrollX permitir el desplazamiento horizontal
-  })
-  
-  # Función para calcular la suma-producto
-  suma_producto_func <- function(x) {
-    sum(x) - prod(x)
-    # sum(x) calcula la suma de todos los elementos en el vector x
-    # prod(x) calcula el producto de todos los elementos en el vector x
-    # La función retorna la diferencia entre la suma y el producto
-  }
-  
-  # Función para realizar la agregación
-  agregar_datos <- function(df, factores, numericas, funcion_agregacion) {
-    df %>%
-      group_by(across(all_of(factores))) %>%
-      summarise(across(all_of(numericas), funcion_agregacion), .groups = 'drop')
-    # df: El dataframe de entrada que contiene los datos a agregar
-    # factores: Un vector de nombres de columnas que se usarán para agrupar los datos
-    # numericas: Un vector de nombres de columnas numéricas que se agregarán
-    # funcion_agregacion: La función de agregación que se aplicará a las columnas numéricas
+body <- dashboardBody(
+  tabItems(
     
-    # group_by(across(all_of(factores))): Agrupa el dataframe por las columnas especificadas en factores
-    # summarise(across(all_of(numericas), funcion_agregacion), .groups = 'drop'):
-    #   - summarise: Crea un nuevo dataframe que contiene una fila por cada grupo
-    #   - across(all_of(numericas), funcion_agregacion): Aplica la función de agregación a cada columna numérica
-    #   - .groups = 'drop': Indica que no se mantengan los grupos en el resultado final
-  }
-  
-  
-  observeEvent(input$describirBtn, {
-    tryCatch({
-          if (!is.null(tc)) {
-            tryCatch({
-              # Valor de Test
-              if (input$tipo_desc) {
-                #Obtengo la tabla agregada en función de los factores seleccionados
-                # Obtener numero de la variables seleccionadas
-                grupo <- match(input$grupo, names(factores()))
-                nombre_fac <-c(colnames(factores()[grupo]))
-                print(nombre_fac)
-                nombre_num <- c(colnames(datos()))
-                #Realizo la agregación mediante la suma algebraica
-                agrega <- as.data.frame(agregar_datos(df(),
-                                                      nombre_fac,
-                                                      nombre_num,
-                                                      suma_producto_func))  
-                # Combinar etiquetas para darle al dataframe un rowname
-                rownames(agrega) <- apply(agrega[, nombre_fac, drop = FALSE], 1, 
-                                          function(x) paste(x, collapse = "_"))
-                # Eliminar las columnas originales de factores si es necesario
-                agrega<-agrega[, !(names(agrega) %in% nombre_fac)]
-                
-                #Escalo la tabla agregada
-                tc_agrega <- escalar(agrega, 0,100)
-                #Elimino marginales nulos
-                tc(as.data.frame.matrix(dellNULMarg(tc_agrega)))
-                
-                # Describir Asociaciones de grupos de filas en función de columnas
-                d0 <- cluster.carac(tc(),row.names(tc()),"fr", neg=FALSE, 1.65)
-                resultados(list(t0="Descripción grupos filas en función columnas",grupo=d0))
-                
-              } else {
-                if(input$escalar){
-                  tcx <-escalar(datos(), 0, 100) # Escalo la tabla agregada
-                }else{
-                  tcx <- datos()
-                }
-                tc((dellNULMarg(tcx))) # elimino marginales nulos
-                d1 <- cluster.carac(tc(),row.names(tc()),"fr", neg=FALSE, 1.65)
-                
-                ttc(dellNULMarg(t(tc())))  # transpuesta
-                d2 <- cluster.carac(ttc(),row.names(ttc()),"fr", neg=FALSE, 1.65)
-                resultados(list(t1="Descripción filas en función columnas", filas = d1, 
-                                t2="Descripción columnas en función filas", columnas = d2))
-              }
-            }, error = function(e) {
-              showModal(modalDialog(
-                title = "Error en cálculo del Valor de Test",
-                paste("Se ha producido un error al aplicar el Demod de frecuencias:", e$message),
-                easyClose = TRUE
-              ))
-            })
-          }
-    }, error = function(e) {
-      showModal(modalDialog(
-        title = "Error al analizar la tabla",
-        "Revise la tabla y asegure no tener datos faltantes o problemas de formato",
-        easyClose = TRUE
-      ))
-      resultados(list(e=paste("Error al analizar la tabla:", e$message, "Revise la tabla y asegure no tener datos faltantes o problemas de formato")))
-    })
+    # ── Pestaña datos_ori ─────────────────────────────────────────────────────
+    tabItem("datos_ori",
+            h3("Carga de fichero CSV"),
+            box(width = 12,
+                h5("Verificar notación científica, acentos, ü, ñ y IDs únicos"),
+                h3("OPCIONES para la carga del CSV"),
+                materialSwitch("header",  "El archivo tiene encabezado",          TRUE),
+                radioButtons("sep",       "Separador de campos:",
+                             choices = c(Coma = ",", Punto_y_Coma = ";", Tabulador = "\t"),
+                             selected = ";"),
+                radioButtons("dec",       "Separador decimal:",
+                             choices = c(Coma = ",", Punto = "."), selected = "."),
+                materialSwitch("escalar", "¿Desea escalar la Tabla?",             TRUE),
+                fileInput("file",         "Selecciona un archivo CSV:", accept = ".csv")
+            ),
+            h3("Tabla de Datos Original"),
+            box(width = 12, DTOutput("originalTable"))
+    ),
     
-      output$Vtest <- renderImage({
-        # Devolver la información de la imagen
-        ruta_relativa <- file.path("imagenes", "sigVtest.png")
-        list(src = ruta_relativa,
-             contentType = "png",
-             width = 250,
-             height = 120)
-      }, deleteFile = FALSE)
-      
-      # Resultados Vtest en cuadro de texto
-      output$desc_results <- renderPrint({
-        req(resultados())
-        d <- resultados()
-        d
-        if (!is.null(d$e)) {
-          # d$e es un mensaje de error o información similar
-          d$e
-        } else {
-          if (input$tipo_desc) {
-            cat(d$t0,"\n")  # Título o encabezado del análisis
-            d$grupo
-          } else {
-            cat(d$t1,"\n")
-            print(d$filas)
-            cat("-----------------------","\n")
-            cat(d$t2,"\n")
-            print(d$columnas)
-          }
-        }
-      })
-      
-      output$afc <- renderPlot({
-        contigencia <- tc()
-        tryCatch({
-            res2 <- FactoMineR::CA( contigencia,
-                                    graph=FALSE ) 
-            resu(res2)
-            return( factoextra::fviz_ca_biplot(res2, 
-                                               col.col = "darkblue",
-                                               col.row = "darkred",
-                                               labelsize = 4, #Ajusta el tamaño de las etiquetas
-                                               pointsize = 5, # Tamaño del punto
-                                               quali.sup = index,
-                                               alpha.row="cos2", # Trasparencia del punto en función de cos2
-                                               alpha.col="cos2", # Trasparencia del punto en función de cos2
-                                               repel = T) + theme_gray()
+    # ── Pestaña texto ──────────────────────────────────────────────────────────
+    tabItem("texto",
+            h3("Caracterización Valor de Test"),
+            fluidRow(
+              sidebarPanel(
+                materialSwitch("tipo_desc","¿Agregación por grupo de filas?", FALSE),
+                conditionalPanel(
+                  "input.tipo_desc == true",
+                  pickerInput("grupo","Variables Agrupación:",
+                              choices = NULL,
+                              options = pickerOptions(actionsBox=TRUE,size=4),
+                              multiple = TRUE)
+                ),
+                actionButton("describirBtn","Describir")
+              ),
+              
+              box(width = 12,
+                  downloadButton("download_tabla",     "Descargar tabla escalada CSV"),
+                  h3(" "),
+                  materialSwitch("con_afc","¿Quieres realizar el AFCS?", TRUE),
+                  conditionalPanel(
+                    "input.con_afc == true",
+                    h4("Análisis Factorial de Correspondencias Simples AFCS"),
+                    plotOutput("afc"),
+                    downloadButton("download_ca","Descargar Resumen AFCS")
+                  ),
+                  h4("Tabla Asociaciones"),
+                  box(width=6, imageOutput("Vtest", height=120)),
+                  h6("Se realiza prueba hipergeométrica y se ordenan asociaciones por Test-Value"),
+                  h3(" "),
+                  conditionalPanel(
+                    "input.tipo_desc == false",
+                    downloadButton("download_descFiltxt","Descargar Descripción Filas TXT"),
+                    downloadButton("download_descColtxt","Descargar Descripción Columnas TXT")
+                  ),
+                  conditionalPanel(
+                    "input.tipo_desc == true",
+                    downloadButton("download_descGFiltxt","Descargar Descripción Grupo Filas TXT")
+                  ),
+                  downloadButton("download_csv_combinado","Descargar CSV Combinado"),
+                  downloadButton("download_excel_freq",    "Descargar frecuencias Excel"),
+                  h3(" "),
+                  box(width = 12, verbatimTextOutput("desc_results"))
+              )
             )
-         
-        }, error = function(e) {
-          showModal(modalDialog(
-            title = "Error en cálculo de AFCS",
-            paste("Se ha producido un error al realizar el Análisis de Correspondencia y visualización del plano factorial:", e$message),
-            easyClose = TRUE
-          ))
-        })
-      })
-     
-      # Guardar los resultados de la descripcion en fichero
-      nombre <- input$file
-         
-     output$download_descFiltxt <- downloadHandler(
-        filename = function() {
-          paste(nombre, "_DescFil.txt")
-        },
-        content = function(file3) {
-          if (!input$tipo_desc) {
-            # Guarda cada data frame en un fichero de texto
-            d <- resultados()
-            t <- capture.output({
-              if (input$tipo_desc) {
-                cat(d$t0,"\n")  # Título o encabezado del análisis
-                # Asumiendo que d$grupo es una lista de estructuras de datos (como data.frames) para cada clase
-                if (!is.null(d$grupo)) {
-                  print(d$grupo)  # Aquí ajustas la impresión según la estructura real de d$grupo
-                }
-              } else {
-                cat(d$t1,"\n")
-                if (!is.null(d$filas)) {
-                  print(d$filas)
-                }
-              }
-            })
-            writeLines(t, file3 )
-          }
-        }
-      )
-     
-    output$download_descColtxt <- downloadHandler(
-        filename = function() {
-          paste(nombre, "_DesCol.txt")
-        },
-        content = function(file5) {
-          if (!input$tipo_desc) {
-            # Guarda cada data frame en un fichero de texto
-            d <- resultados()
-            t <- capture.output({
-              if (input$tipo_desc) {
-                cat(d$t0,"\n")  # Título o encabezado del análisis
-                # Asumiendo que d$grupo es una lista de estructuras de datos (como data.frames) para cada clase
-                if (!is.null(d$grupo)) {
-                  print(d$grupo)  # Aquí ajustas la impresión según la estructura real de d$grupo
-                }
-              } else {
-                cat(d$t2,"\n")
-                if (!is.null(d$columnas)) {
-                  print(d$columnas)
-                }
-              }
-            })
-            
-            writeLines(t, file5 )
-          }
-        }
-      )      
-   
-      output$download_descGFiltxt <- downloadHandler(
-        filename = function() {
-          paste(nombre, "_DescGrupFil.txt")
-        },
-        content = function(file7) {
-          # Guarda cada data frame en un fichero de texto
-          if (input$tipo_desc) {
-            # Guarda cada data frame en un fichero de texto
-            d <- resultados()
-            t <- capture.output({
-              if (input$tipo_desc) {
-                cat(d$t0,"\n")  # Título o encabezado del análisis
-                # Asumiendo que d$grupo es una lista de estructuras de datos (como data.frames) para cada clase
-                if (!is.null(d$grupo)) {
-                  print(d$grupo)  # Aquí ajustas la impresión según la estructura real de d$grupo
-                }
-              } else {
-                cat(d$t1,"\n")
-                if (!is.null(d$filas)) {
-                  print(d$filas)
-                }
-                cat(d$t2,"\n")
-                if (!is.null(d$columnas)) {
-                  print(d$columnas)
-                }              }
-            })
-            writeLines(t, file7 )
-          }
-        }
-      )
-     
-      output$download_ca <- downloadHandler(
-        filename = function() {
-          paste(nombre, "_AFCS.txt")
-        },
-        content = function(fileAFCS) {
-          # En 'resu()' resultado de tu análisis de correspondencia
-          resAFC <- resu()
-          eig.val <- get_eigenvalue(resAFC)
-          row <- get_ca_row(resAFC)
-          col <- get_ca_col(resAFC)
-          # Crear un data frame con los resultados
-            t <- capture.output(print("Eigen Values"), print(round(eig.val,2)), print("\n"),
-                                print("Coordenadas Filas"), print(round(row$coord,2)), print("\n"),
-                                print("Coordenadas Columnas"), print(round(col$coord,2)),print("\n"),
-                                print("Cosenos cuadrados Filas"), print(round(row$cos2,2)), print("\n"),
-                                print("Cosenos cuadrados Columnas"), print(round(col$cos2,2))
-                       )
-          # Escribir los resultados en un archivo de texto
-             writeLines(t, fileAFCS)
-        }
-      )
-    })   
-  
-  # Guardar las tablas escaladas
-  output$download_tabla <- downloadHandler(
-    filename = function() {
-      paste("TablaEscalada_",input$file$name)
-    },
-    content = function(file1) {
-      write.csv2(tc(), file1, row.names = TRUE)
-    }
+    )
+    
   )
+)
+
+ui <- dashboardPage(skin = "green", header, sidebar, body)
+
+
+# ─── SERVER ─────────────────────────────────────────────────────────────────
+server <- function(input, output, session) {
+  datos      <- reactiveVal(NULL)
+  df         <- reactiveVal(NULL)
+  factores   <- reactiveVal(NULL)
+  tc         <- reactiveVal(NULL)
+  ttc        <- reactiveVal(NULL)
+  resultados <- reactiveVal(list())
   
-  # Función para separar la columna 'class' según el guion bajo
-  separar_class <- function(df) {
-    # Verificar si la columna 'class' tiene guiones bajos
-    if (any(grepl("_", df$class))) {
-      # Dividir la columna 'class' en múltiples columnas
-      class_parts <- strsplit(as.character(df$class), "_")
-      
-      # Calcular el número máximo de partes
-      max_parts <- max(sapply(class_parts, length))
-      
-      # Crear nombres para las nuevas columnas
-      column_names <- paste0("class_part_", seq_len(max_parts))
-      
-      # Convertir la lista a un dataframe con las columnas nuevas
-      class_df <- do.call(rbind, lapply(class_parts, function(x) {
-        # Rellenar con NA si hay menos partes
-        length(x) <- max_parts
-        return(x)
-      }))
-      
-      # Añadir las columnas al dataframe original
-      class_df <- as.data.frame(class_df, stringsAsFactors = FALSE)
-      names(class_df) <- column_names
-      df <- cbind(df, class_df)
+  # para retener la tabla de frecuencias antes de exportar
+  last_freq <- reactiveVal(data.frame())
+  
+  # Carga CSV y actualiza pickers
+  observeEvent(input$file, {
+    req(input$file)
+    D <- read.csv2(input$file$datapath,
+                   header      = input$header,
+                   sep         = input$sep,
+                   dec         = input$dec,
+                   stringsAsFactors = TRUE,
+                   row.names   = 1,
+                   fileEncoding = "UTF-8")
+    df(D)
+    datos(D[, sapply(D, is.numeric), drop = FALSE])
+    factDF <- D[, sapply(D, is.factor), drop = FALSE]
+    factores(factDF)
+    updatePickerInput(session, "grupo", choices = names(factDF))
+  })
+  
+  # Mostrar datos originales
+  output$originalTable <- renderDT({
+    req(df())
+    datatable(df(), options = list(scrollX = TRUE))
+  })
+  
+  # Renderizar imagen V-test
+  output$Vtest <- renderImage({
+    list(src = file.path("imagenes","sigVtest.png"),
+         contentType = "image/png", width = 250, height = 120)
+  }, deleteFile = FALSE)
+  
+  # Describir (cluster.carac + AFCS + resultados)
+  observeEvent(input$describirBtn, {
+    req(df())
+    
+    # … lógica original para calcular tc(), d0 o d1/d2, resultados() …
+    if (input$tipo_desc) {
+      # agrupación por variables de grupo
+      grupos_idx <- match(input$grupo, names(factores()))
+      nom_fac    <- names(factores())[grupos_idx]
+      agrega <- as.data.frame(
+        df() %>%
+          group_by(across(all_of(nom_fac))) %>%
+          summarise(across(where(is.numeric), ~ sum(.) - prod(.)), .groups='drop')
+      )
+      rownames(agrega) <- apply(agrega[, nom_fac, drop=FALSE], 1, paste, collapse="_")
+      agrega <- agrega[, setdiff(names(agrega), nom_fac), drop = FALSE]
+      tc(escalar(agrega,0,100) %>% dellNULMarg())
+      d0 <- cluster.carac(tc(), row.names(tc()), "fr", neg = FALSE, 1.65)
+      resultados(list(t0 = "Descripción grupos filas en función columnas", grupo = d0))
+    } else {
+      # descripción filas/columnas
+      tabx <- if (input$escalar) escalar(datos(),0,100) else datos()
+      tc(dellNULMarg(tabx))
+      d1 <- cluster.carac(tc(), row.names(tc()), "fr", neg = FALSE, 1.65)
+      ttc(dellNULMarg(t(tc())))
+      d2 <- cluster.carac(ttc(), row.names(ttc()), "fr", neg = FALSE, 1.65)
+      resultados(list(
+        t1 = "Descripción filas en función columnas", filas = d1,
+        t2 = "Descripción columnas en función filas", columnas = d2
+      ))
     }
     
-    return(df)
-  }
-  
- 
-  output$download_csv_combinado <- downloadHandler(
-    filename = function() {
-      paste("Descripcion_Resultados_Combinados.csv")
-    },
-    content = function(file) {
-      # Verifica si los resultados están disponibles
-      d <- resultados()
-      
-      if (is.null(d)) {
-        # Mostrar un modal indicando que no hay resultados si no se ha hecho el cálculo previo
-        showModal(modalDialog(
-          title = "Error",
-          "No hay resultados para descargar. Por favor, realiza la descripción antes de intentar descargar.",
-          easyClose = TRUE
-        ))
-        return()
-      }
-      
-      # Inicializar un dataframe vacío para almacenar los resultados del CSV
-      csv_data <- data.frame(
-        class = character(0),
-        caracteristica_asociada = character(0),  # Sin acento
-        Test_Value = numeric(0)
+    # AFCS
+    if (input$con_afc) {
+      output$afc <- renderPlot({
+        resAFC <- FactoMineR::CA(tc(), graph = FALSE)
+        factoextra::fviz_ca_biplot(resAFC,
+                                   col.col = "darkblue",
+                                   col.row = "darkred",
+                                   labelsize = 4,
+                                   pointsize = 5,
+                                   repel = TRUE) +
+          ggthemes::theme_tufte()
+      })
+      output$download_ca <- downloadHandler(
+        filename = function() paste0(tools::file_path_sans_ext(input$file$name), "_AFCS.txt"),
+        content = function(f) {
+          resAFC <- FactoMineR::CA(tc(), graph = FALSE)
+          eig  <- factoextra::get_eigenvalue(resAFC)
+          rowc <- factoextra::get_ca_row(resAFC)
+          colc <- factoextra::get_ca_col(resAFC)
+          t <- capture.output({
+            print("Eigenvalues:");    print(round(eig,2))
+            print("Row coords:");     print(round(rowc$coord,2))
+            print("Column coords:");  print(round(colc$coord,2))
+          })
+          writeLines(t, f)
+        }
       )
-      
-      # Si input$tipo_desc es TRUE, procesar d$grupo
+    }
+    
+    # Imprimir resultados en pantalla
+    output$desc_results <- renderPrint({
+      res <- resultados()
       if (input$tipo_desc) {
-        if (!is.null(d$grupo)) {
-          desc_df <- d$grupo
-          
-          # Recorrer cada clase en la descripción de grupos
-          for (class_name in names(desc_df)) {
-            # Obtener el dataframe asociado a la clase actual
-            class_data <- desc_df[[class_name]]
-            
-            if (is.data.frame(class_data)) {
-              # Recorrer cada fila del dataframe de la clase actual
-              for (i in 1:nrow(class_data)) {
-                caracteristica <- rownames(class_data)[i]
-                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
-                
-                # Añadir una nueva fila al dataframe csv_data
-                nueva_fila <- data.frame(
-                  class = class_name,
-                  caracteristica_asociada = caracteristica,
-                  Test_Value = test_value
-                )
-                csv_data <- rbind(csv_data, nueva_fila)
-              }
-            }
-          }
-          
-          # Separar la columna 'class' en múltiples columnas si tiene "_"
-          csv_data <- separar_class(csv_data)
-        }
+        cat(res$t0, "\n"); print(res$grupo)
       } else {
-        # Si input$tipo_desc es FALSE, procesar d$filas y d$columnas
-        
-        # Procesar la descripción de filas
-        if (!is.null(d$filas)) {
-          desc_df <- d$filas
-          
-          # Recorrer cada clase en la descripción de filas
-          for (class_name in names(desc_df)) {
-            # Obtener el dataframe asociado a la clase actual
-            class_data <- desc_df[[class_name]]
-            
-            if (is.data.frame(class_data)) {
-              # Recorrer cada fila del dataframe de la clase actual
-              for (i in 1:nrow(class_data)) {
-                caracteristica <- rownames(class_data)[i]
-                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
-                
-                # Añadir una nueva fila al dataframe csv_data
-                nueva_fila <- data.frame(
-                  class = class_name,
-                  caracteristica_asociada = caracteristica,
-                  Test_Value = test_value
-                )
-                csv_data <- rbind(csv_data, nueva_fila)
-              }
-            }
-          }
-        }
-        
-        # Procesar la descripción de columnas
-        if (!is.null(d$columnas)) {
-          desc_df <- d$columnas
-          
-          # Recorrer cada clase en la descripción de columnas
-          for (class_name in names(desc_df)) {
-            # Obtener el dataframe asociado a la clase actual
-            class_data <- desc_df[[class_name]]
-            
-            if (is.data.frame(class_data)) {
-              # Recorrer cada fila del dataframe de la clase actual
-              for (i in 1:nrow(class_data)) {
-                caracteristica <- rownames(class_data)[i]
-                test_value <- format(round(class_data[i, "Test.Value"], 2), nsmall = 2)
-                
-                # Añadir una nueva fila al dataframe csv_data
-                nueva_fila <- data.frame(
-                  class = class_name,
-                  caracteristica_asociada = caracteristica,
-                  Test_Value = test_value
-                )
-                csv_data <- rbind(csv_data, nueva_fila)
-              }
-            }
-          }
+        cat(res$t1, "\n"); print(res$filas)
+        cat("-------\n"); cat(res$t2, "\n"); print(res$columnas)
+      }
+    })
+    
+    # Construir tabla de frecuencias para exportar
+    freq_df <- data.frame()
+    res <- resultados()
+    if (input$tipo_desc) {
+      for(cl in names(res$grupo)) {
+        tab <- res$grupo[[cl]]
+        if (is.data.frame(tab)) {
+          tmp <- data.frame(
+            class = cl,
+            characteristic = rownames(tab),
+            Test.Value     = tab[,"Test.Value"],
+            stringsAsFactors = FALSE
+          )
+          freq_df <- bind_rows(freq_df, tmp)
         }
       }
-      
-      # Verificar si csv_data tiene datos válidos antes de guardarlo
-      if (nrow(csv_data) == 0) {
-        showModal(modalDialog(
-          title = "Error en la Descripción",
-          "No se encontraron datos válidos para escribir en el CSV.",
-          easyClose = TRUE
-        ))
-        return()
+    } else {
+      for(cl in names(res$filas)) {
+        tab <- res$filas[[cl]]
+        tmp <- data.frame(
+          class = cl,
+          characteristic = rownames(tab),
+          Test.Value     = tab[,"Test.Value"],
+          stringsAsFactors = FALSE
+        )
+        freq_df <- bind_rows(freq_df, tmp)
       }
-      
-      # Guardar el DataFrame en el archivo CSV
-      write.csv2(csv_data, file, row.names = FALSE)
+      for(cl in names(res$columnas)) {
+        tab <- res$columnas[[cl]]
+        tmp <- data.frame(
+          class = cl,
+          characteristic = rownames(tab),
+          Test.Value     = tab[,"Test.Value"],
+          stringsAsFactors = FALSE
+        )
+        freq_df <- bind_rows(freq_df, tmp)
+      }
+    }
+    last_freq(freq_df)
+  })
+  
+  
+  # ── Descarga de la tabla de contingencia escalada
+  output$download_tabla <- downloadHandler(
+    filename = function() paste0("TablaEscalada_", input$file$name),
+    content  = function(f) write.csv2(tc(), f, row.names = TRUE)
+  )
+  
+  # ── Descargas TXT (descripciones) ──────────────────────────────────────────
+  output$download_descFiltxt <- downloadHandler(
+    filename = function() paste0(input$file$name, "_DescFil.txt"),
+    content  = function(f) {
+      res <- resultados()
+      t <- capture.output({
+        cat(res$t1, "\n"); print(res$filas)
+      })
+      writeLines(t, f)
+    }
+  )
+  output$download_descColtxt <- downloadHandler(
+    filename = function() paste0(input$file$name, "_DescCol.txt"),
+    content  = function(f) {
+      res <- resultados()
+      t <- capture.output({
+        cat(res$t2, "\n"); print(res$columnas)
+      })
+      writeLines(t, f)
+    }
+  )
+  output$download_descGFiltxt <- downloadHandler(
+    filename = function() paste0(input$file$name, "_DescGrp.txt"),
+    content  = function(f) {
+      res <- resultados()
+      t <- capture.output({
+        cat(res$t0, "\n"); print(res$grupo)
+      })
+      writeLines(t, f)
     }
   )
   
-
+  # ── CSV combinado (class, characteristic, Test.Value) ─────────────────────
+  output$download_csv_combinado <- downloadHandler(
+    filename = function() paste0(input$file$name, "_combinado.csv"),
+    content = function(f) {
+      freq_df <- last_freq()
+      write.csv2(freq_df, f, row.names = FALSE)
+    }
+  )
+  
+  # ── NUEVO: Descargar frecuencias en Excel ───────────────────────────────────
+  output$download_excel_freq <- downloadHandler(
+    filename = function() {
+      paste0(tools::file_path_sans_ext(input$file$name), "_frecuencias.xlsx")
+    },
+    content = function(path) {
+      req(last_freq())
+      write.xlsx(
+        list(Frecuencias = last_freq()),
+        path,
+        rowNames = FALSE
+      )
+    }
+  )
 }
 
-# Ejecutar la aplicación Shiny
 shinyApp(ui, server)
-
-
